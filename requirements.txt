@@ -1,0 +1,9 @@
+streamlit
+pandas
+joblib
+rdkit
+tensorflow
+keras
+chardet
+py3Dmol
+streamlit-ketcher
