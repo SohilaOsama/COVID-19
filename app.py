@@ -192,8 +192,8 @@ if st.session_state.page == "Home":
                                         {bioactivity.capitalize()}
                                     </span>
                                 </p>
-                                <p><b>🔍 Accuracy:</b> <span class="result-value">{accuracy:.2%}</span> <span class="explanation">(What does this mean? The accuracy represents the proportion of correct predictions out of the total predictions made by the model. It is calculated as \( \text{{Accuracy}} = \frac{{\text{{Number of Correct Predictions}}}}{{\text{{Total Number of Predictions}}}} \times 100 \))</span></p>
-                                <p><b>📉 Error Percentage:</b> <span class="result-value" style="color: #D32F2F;">{error_percentage:.2%}</span> <span class="explanation">(What does this mean? The error percentage represents the proportion of incorrect predictions out of the total predictions made by the model. It is calculated as \( \text{{Error}} = \frac{{\text{{Number of Incorrect Predictions}}}}{{\text{{Total Number of Predictions}}}} \times 100 \))</span></p>
+                                <p><b>🔍 Accuracy:</b> <span class="result-value">{accuracy:.2%}</span> <a href="#accuracy-explanation">?</a></p>
+                                <p><b>📉 Error Percentage:</b> <span class="result-value" style="color: #D32F2F;">{error_percentage:.2%}</span> <a href="#error-explanation">?</a></p>
                             </div>
                             """,
                             unsafe_allow_html=True
@@ -212,7 +212,7 @@ if st.session_state.page == "Home":
                                         {bioactivity.capitalize()}
                                     </span>
                                 </p>
-                                <p><b>🔍 Accuracy:</b> <span class="result-value">{accuracy:.2%}</span> <span class="explanation">(What does this mean? The accuracy represents the proportion of correct predictions out of the total predictions made by the model. It is calculated as \( \text{{Accuracy}} = \frac{{\text{{Number of Correct Predictions}}}}{{\text{{Total Number of Predictions}}}} \times 100 \))</span></p>
+                                <p><b>🔍 Accuracy:</b> <span class="result-value">{accuracy:.2%}</span> <a href="#accuracy-explanation">?</a></p>
                             </div>
                             """,
                             unsafe_allow_html=True
@@ -228,6 +228,29 @@ if st.session_state.page == "Home":
                 st.components.v1.html(viewer_html, height=500)
             else:
                 st.error(f"Invalid SMILES string: {smiles_input}")
+
+            # Explanations
+            st.markdown("<a id='accuracy-explanation'></a>", unsafe_allow_html=True)
+            with st.expander("What does Accuracy mean?"):
+                st.write("""
+                The accuracy represents the proportion of correct predictions out of the total predictions made by the model. 
+                It is calculated as:
+                
+                \[
+                \text{Accuracy} = \frac{\text{Number of Correct Predictions}}{\text{Total Number of Predictions}} \times 100
+                \]
+                """)
+
+            st.markdown("<a id='error-explanation'></a>", unsafe_allow_html=True)
+            with st.expander("What does Error Percentage mean?"):
+                st.write("""
+                The error percentage represents the proportion of incorrect predictions out of the total predictions made by the model. 
+                It is calculated as:
+                
+                \[
+                \text{Error} = \frac{\text{Number of Incorrect Predictions}}{\text{Total Number of Predictions}} \times 100
+                \]
+                """)
 
         elif uploaded_file:
             try:
