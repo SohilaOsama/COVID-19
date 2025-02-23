@@ -47,8 +47,6 @@ def smiles_to_morgan(smiles, radius=2, n_bits=1024):
 
 # Generate fixed accuracy and error percentage
 def generate(smiles):
-    hash_object = hashlib.sha256(smiles.encode())
-    hash_digest = hash_object.hexdigest()
     accuracy = 88 / 100  # Fixed accuracy of 88%
     error_percentage = 30 / 100  # Fixed error percentage of 30%
     return accuracy, error_percentage
