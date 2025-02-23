@@ -9,4 +9,5 @@ py3Dmol
 streamlit-ketcher
 # rdkit-pypi
 pillow  
+scikit-learn
 
