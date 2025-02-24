@@ -164,7 +164,7 @@ if st.session_state.page == "Home":
 
     # Add the note under instructions
     st.markdown("""
-    The ligand efficiency cut off for hit compounds is set to be between 0.2 and 0.35. Hit compounds are compounds that show some activity against the target protein and can be chemically modified to have improved potency and drug-like properties. The binding of hits to the target does not have to be extremely good as this can be optimised further after hit identification. This broad range of ligand efficiencies chosen is due a large range of heavy atom counts (HAC) among all the screened compounds. HAC is a proxy for molecular size. The optimal ligand effiency cut off depends on the molecular size of the screened compounds. The details of calculating target ligand efficiency values can be found in this paper. [⁵](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3772997/#FD2). A larger range of ligand efficiency values also allow for a more diverse set of hits to be investigated. This can potentially lead to drug molecules with novel structures compared to marketed drugs.
+    The ligand efficiency cut off for hit compounds is set to be between 0.2 and 0.35. Hit compounds are compounds that show some activity against the target protein and can be chemically modified to have improved potency and drug-like properties. The binding of hits to the target does not have to be extremely good as this can be optimised further after hit identification. This broad range of ligand efficiencies chosen is due a large range of heavy atom counts (HAC) among all the screened compounds. HAC is a proxy for molecular size. The optimal ligand effiency cut off depends on the molecular size of the screened compounds. The details of calculating target ligand efficiency values can be found in this paper. [1](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3772997/#FD2). A larger range of ligand efficiency values also allow for a more diverse set of hits to be investigated. This can potentially lead to drug molecules with novel structures compared to marketed drugs.
     """)
 
     # Input: Single SMILES string or file upload
@@ -175,6 +175,15 @@ if st.session_state.page == "Home":
     if st.button("Predict"):
         if smiles_input:
             with st.spinner("Predicting..."):
+                # Calculate descriptors and display in a table
+                descriptors = calculate_descriptors(smiles_input)
+                if descriptors:
+                    st.markdown("### Molecular Descriptors")
+                    descriptors_df = pd.DataFrame([descriptors])
+                    st.table(descriptors_df)
+                else:
+                    st.error("Invalid SMILES string.")
+
                 if model_choice == "Multi-Tasking Neural Network":
                     pIC50, bioactivity, accuracy, error_percentage = predict_with_nn(smiles_input)
                     if pIC50 is not None:
