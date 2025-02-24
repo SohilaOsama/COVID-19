@@ -61,6 +61,9 @@ def predict_with_nn(smiles):
     try:
         # Convert SMILES to Morgan fingerprints
         fingerprints = smiles_to_morgan(smiles)
+        if fingerprints is None:
+            raise ValueError("Invalid SMILES string.")
+        
         fingerprints_df = pd.DataFrame([fingerprints], columns=[str(i) for i in range(len(fingerprints))])
 
         # Scale the features
@@ -282,15 +285,15 @@ if st.session_state.page == "Home":
                 df.dropna(inplace=True)
 
                 results = []
+                all_descriptors = []
                 for smiles in df["SMILES"]:
-                    # Calculate descriptors and display in a table
+                    # Calculate descriptors and store them
                     descriptors = calculate_descriptors(smiles)
                     if descriptors:
-                        st.markdown("### Molecular Descriptors")
-                        descriptors_df = pd.DataFrame([descriptors])
-                        st.table(descriptors_df)
+                        all_descriptors.append(descriptors)
                     else:
                         st.error("Invalid SMILES string.")
+                        continue
 
                     if model_choice == "Multi-Tasking Neural Network":
                         pIC50, bioactivity, accuracy, error_percentage = predict_with_nn(smiles)
@@ -303,15 +306,22 @@ if st.session_state.page == "Home":
                         bioactivity, accuracy = predict_with_stacking(smiles)
                         results.append([smiles, bioactivity if bioactivity else "Error", accuracy if accuracy else "Error"])
 
-                if model_choice == "Multi-Tasking Neural Network":
-                    results_df = pd.DataFrame(results, columns=["SMILES", "pIC50", "IC50 (µM)", "IC50 (nM)", "IC50 (ng/µL)", "Bioactivity", "Accuracy", "Error Percentage"])
-                else:
-                    results_df = pd.DataFrame(results, columns=["SMILES", "Bioactivity", "Accuracy"])
+                # Display descriptors
+                if all_descriptors:
+                    st.markdown("### Molecular Descriptors")
+                    all_descriptors_df = pd.DataFrame(all_descriptors)
+                    st.table(all_descriptors_df)
 
-                st.dataframe(results_df)
-                csv = results_df.to_csv(index=False).encode('utf-8')
-                st.download_button("Download Predictions", csv, "bioactivity_predictions.csv", "text/csv")
-                st.success("Predictions completed.")
+                if results:
+                    if model_choice == "Multi-Tasking Neural Network":
+                        results_df = pd.DataFrame(results, columns=["SMILES", "pIC50", "IC50 (µM)", "IC50 (nM)", "IC50 (ng/µL)", "Bioactivity", "Accuracy", "Error Percentage"])
+                    else:
+                        results_df = pd.DataFrame(results, columns=["SMILES", "Bioactivity", "Accuracy"])
+
+                    st.dataframe(results_df)
+                    csv = results_df.to_csv(index=False).encode('utf-8')
+                    st.download_button("Download Predictions", csv, "bioactivity_predictions.csv", "text/csv")
+                    st.success("Predictions completed.")
 
             except Exception as e:
                 st.error(f"Error processing the uploaded file: {e}")
