@@ -54,12 +54,19 @@ def generate(smiles):
 # Prediction using multi-tasking neural network
 def predict_with_nn(smiles):
     try:
-        # Calculate molecular descriptors
-        descriptors = calculate_descriptors(smiles)
-        descriptors_df = pd.DataFrame([descriptors])
+        # Molecular processing
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            raise ValueError("Invalid SMILES string")
 
-        # Convert SMILES to Morgan fingerprints
+        # Feature extraction
+        descriptors = calculate_descriptors(smiles)
         fingerprints = smiles_to_morgan(smiles)
+
+        if descriptors is None or fingerprints is None:
+            raise ValueError("Failed to generate molecular features")
+
+        descriptors_df = pd.DataFrame([descriptors])
         fingerprints_df = pd.DataFrame([fingerprints], columns=[str(i) for i in range(len(fingerprints))])
 
         # Combine descriptors and fingerprints
@@ -89,8 +96,11 @@ def predict_with_nn(smiles):
         accuracy, error_percentage = generate(smiles)
 
         return pIC50, bioactivity, accuracy, error_percentage
+    except ValueError as ve:
+        st.error(f"⚠️ {ve}")
+        return None, None, None, None
     except Exception as e:
-        st.error(f"Error in prediction: {e}")
+        st.error(f"Unexpected error: {e}")
         return None, None, None, None
 
 # Prediction function for Stacking Classifier
@@ -99,14 +109,22 @@ def predict_with_stacking(smiles):
         fingerprints = smiles_to_morgan(smiles)
         if fingerprints:
             fingerprints_df = pd.DataFrame([fingerprints])
+
+            if fingerprints_df.shape[1] != variance_threshold.get_support().sum():
+                st.error("Feature mismatch: Check model compatibility with input data.")
+                return None, None
+
             X_filtered = variance_threshold.transform(fingerprints_df)
             prediction = stacking_clf.predict(X_filtered)
             accuracy, _ = generate(smiles)  # Use the same function to generate fixed accuracy
             class_mapping = {0: 'inactive', 1: 'active'}
             return class_mapping[prediction[0]], accuracy
         return None, None
+    except ValueError as ve:
+        st.error(f"⚠️ {ve}")
+        return None, None
     except Exception as e:
-        st.error(f"Error in prediction: {e}")
+        st.error(f"Unexpected error: {e}")
         return None, None
 
 # Convert pIC50 values
@@ -283,22 +301,22 @@ if st.session_state.page == "Home":
                 df.columns = ["SMILES"]
                 df.dropna(inplace=True)
 
+                smiles_list = df["SMILES"].tolist()
                 results = []
-                for smiles in df["SMILES"]:
-                    if model_choice == "Multi-Tasking Neural Network":
+
+                if model_choice == "Multi-Tasking Neural Network":
+                    for smiles in smiles_list:
                         pIC50, bioactivity, accuracy, error_percentage = predict_with_nn(smiles)
                         if pIC50 is not None:
                             mol_weight = calculate_descriptors(smiles)['MolWt']
                             results.append([smiles, pIC50, convert_pIC50_to_uM(pIC50), convert_pIC50_to_nM(pIC50), convert_pIC50_to_ng_per_uL(pIC50, mol_weight), bioactivity, accuracy, error_percentage])
                         else:
                             results.append([smiles, "Error", "Error", "Error", "Error", "Error", "Error", "Error"])
-                    else:
-                        bioactivity, accuracy = predict_with_stacking(smiles)
-                        results.append([smiles, bioactivity if bioactivity else "Error", accuracy if accuracy else "Error"])
-
-                if model_choice == "Multi-Tasking Neural Network":
                     results_df = pd.DataFrame(results, columns=["SMILES", "pIC50", "IC50 (µM)", "IC50 (nM)", "IC50 (ng/µL)", "Bioactivity", "Accuracy", "Error Percentage"])
                 else:
+                    for smiles in smiles_list:
+                        bioactivity, accuracy = predict_with_stacking(smiles)
+                        results.append([smiles, bioactivity if bioactivity else "Error", accuracy if accuracy else "Error"])
                     results_df = pd.DataFrame(results, columns=["SMILES", "Bioactivity", "Accuracy"])
 
                 st.dataframe(results_df)
