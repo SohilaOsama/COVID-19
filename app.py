@@ -33,10 +33,15 @@ def calculate_descriptors(smiles):
     mol = Chem.MolFromSmiles(smiles)
     if mol:
         return {
-            'MolWt': Descriptors.MolWt(mol),
+            'MolecularWeight': Descriptors.MolWt(mol),
             'LogP': Descriptors.MolLogP(mol),
-            'NumHDonors': Descriptors.NumHDonors(mol),
-            'NumHAcceptors': Descriptors.NumHAcceptors(mol)
+            'HydrogenBondDonors': Descriptors.NumHDonors(mol),
+            'HydrogenBondAcceptors': Descriptors.NumHAcceptors(mol),
+            'TopologicalPolarSurfaceArea': Descriptors.TPSA(mol),
+            'NumberofRotatableBonds': Descriptors.NumRotatableBonds(mol),
+            'NumberofValenceElectrons': Descriptors.NumValenceElectrons(mol),
+            'NumberofAromaticRings': Descriptors.NumAromaticRings(mol),
+            'Fractionofsp3Carbons': Descriptors.FractionCSP3(mol)
         }
     return None
 
@@ -54,22 +59,18 @@ def generate(smiles):
 # Prediction using multi-tasking neural network
 def predict_with_nn(smiles):
     try:
-        # Calculate molecular descriptors
-        descriptors = calculate_descriptors(smiles)
-        descriptors_df = pd.DataFrame([descriptors])
-
         # Convert SMILES to Morgan fingerprints
         fingerprints = smiles_to_morgan(smiles)
+        if fingerprints is None:
+            raise ValueError("Invalid SMILES string.")
+        
         fingerprints_df = pd.DataFrame([fingerprints], columns=[str(i) for i in range(len(fingerprints))])
 
-        # Combine descriptors and fingerprints
-        combined_df = pd.concat([descriptors_df, fingerprints_df], axis=1)
-
         # Scale the features
-        combined_scaled = scaler.transform(combined_df)
+        combined_scaled = scaler.transform(fingerprints_df)
 
         # Select only the features used during training
-        combined_selected = pd.DataFrame(combined_scaled, columns=combined_df.columns)[selected_features]
+        combined_selected = pd.DataFrame(combined_scaled, columns=fingerprints_df.columns)[selected_features]
 
         # Convert to NumPy array for inference
         input_data = combined_selected.to_numpy()
@@ -164,7 +165,7 @@ if st.session_state.page == "Home":
 
     # Add the note under instructions
     st.markdown("""
-    The ligand efficiency cut off for hit compounds is set to be between 0.2 and 0.35. Hit compounds are compounds that show some activity against the target protein and can be chemically modified to have improved potency and drug-like properties. The binding of hits to the target does not have to be extremely good as this can be optimised further after hit identification. This broad range of ligand efficiencies chosen is due a large range of heavy atom counts (HAC) among all the screened compounds. HAC is a proxy for molecular size. The optimal ligand effiency cut off depends on the molecular size of the screened compounds. The details of calculating target ligand efficiency values can be found in this paper. [1](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3772997/#FD2). A larger range of ligand efficiency values also allow for a more diverse set of hits to be investigated. This can potentially lead to drug molecules with novel structures compared to marketed drugs.
+    The ligand efficiency cut off for hit compounds is set to be between 0.2 and 0.35. Hit compounds are compounds that show some activity against the target protein and can be chemically modified to have improved potency and drug-like properties. The binding of hits to the target does not have to be extremely good as this can be optimised further after hit identification. This broad range of ligand efficiencies chosen is due a large range of heavy atom counts (HAC) among all the screened compounds. HAC is a proxy for molecular size. The optimal ligand effiency cut off depends on the molecular size of the screened compounds. The details of calculating target ligand efficiency values can be found in this paper. [⁵](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3772997/#FD2). A larger range of ligand efficiency values also allow for a more diverse set of hits to be investigated. This can potentially lead to drug molecules with novel structures compared to marketed drugs.
     """)
 
     # Input: Single SMILES string or file upload
@@ -187,7 +188,7 @@ if st.session_state.page == "Home":
                 if model_choice == "Multi-Tasking Neural Network":
                     pIC50, bioactivity, accuracy, error_percentage = predict_with_nn(smiles_input)
                     if pIC50 is not None:
-                        mol_weight = calculate_descriptors(smiles_input)['MolWt']
+                        mol_weight = descriptors['MolecularWeight']
                         st.markdown(
                             f"""
                             <div class="result-container">
@@ -288,7 +289,7 @@ if st.session_state.page == "Home":
                     if model_choice == "Multi-Tasking Neural Network":
                         pIC50, bioactivity, accuracy, error_percentage = predict_with_nn(smiles)
                         if pIC50 is not None:
-                            mol_weight = calculate_descriptors(smiles)['MolWt']
+                            mol_weight = calculate_descriptors(smiles)['MolecularWeight']
                             results.append([smiles, pIC50, convert_pIC50_to_uM(pIC50), convert_pIC50_to_nM(pIC50), convert_pIC50_to_ng_per_uL(pIC50, mol_weight), bioactivity, accuracy, error_percentage])
                         else:
                             results.append([smiles, "Error", "Error", "Error", "Error", "Error", "Error", "Error"])
