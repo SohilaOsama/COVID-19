@@ -120,7 +120,7 @@ def convert_pIC50_to_nM(pIC50):
     return 10 ** (-pIC50) * 1e9
 
 # Streamlit UI
-st.set_page_config(page_title="Bioactivity Prediction", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="Bioactivity Prediction", page_icon="👨🏼‍🔬", layout="wide")
 
 # Load custom CSS
 with open("style.css") as f:
@@ -150,7 +150,7 @@ else:
         st.session_state.page = "Home"
 
 if st.session_state.page == "Home":
-    st.title("🧪 Bioactivity Prediction from SMILES")
+    st.title("👩🏻‍🔬 Bioactivity Prediction from SMILES")
     st.image("images/Drug.png", use_container_width=True)
 
     # Instructions
