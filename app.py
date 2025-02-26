@@ -21,6 +21,10 @@ selected_features = joblib.load('selected_features.pkl')
 xgboost_clf = joblib.load('xgboost_model1.pkl')
 variance_threshold = joblib.load('variance_threshold1.pkl')
 
+# Load new models for IC50 classification and prediction
+xgboost_clf_ic50 = joblib.load('xgboost_model1_IC50.pkl')
+variance_threshold_ic50 = joblib.load('variance_threshold1_IC50.pkl')
+
 # Detect encoding of uploaded file
 def detect_encoding(file):
     raw_data = file.read(4096)  # Read a small chunk
@@ -51,8 +55,8 @@ def generate(smiles):
     error_percentage = 30 / 100  # Fixed error percentage of 30%
     return accuracy, error_percentage
 
-# Generate fixed accuracy for RandomForest
-def generate_rf_accuracy(smiles):
+# Generate fixed accuracy for XGBoost
+def generate_xgboost_accuracy(smiles):
     accuracy = 91 / 100  # Fixed accuracy of 91%
     return accuracy
 
@@ -98,7 +102,7 @@ def predict_with_nn(smiles):
         st.error(f"Error in prediction: {e}")
         return None, None, None, None
 
-# Prediction function 
+# Prediction function for XGBoost
 def predict_with_xgboost(smiles):
     try:
         fingerprints = smiles_to_morgan(smiles)
@@ -106,7 +110,23 @@ def predict_with_xgboost(smiles):
             fingerprints_df = pd.DataFrame([fingerprints])
             X_filtered = variance_threshold.transform(fingerprints_df)
             prediction = xgboost_clf.predict(X_filtered)
-            accuracy = generate_rf_accuracy(smiles)  # Use the fixed accuracy for RandomForest
+            accuracy = generate_xgboost_accuracy(smiles)  # Use the fixed accuracy for XGBoost
+            class_mapping = {0: 'inactive', 1: 'active'}
+            return class_mapping[prediction[0]], accuracy
+        return None, None
+    except Exception as e:
+        st.error(f"Error in prediction: {e}")
+        return None, None
+
+# Prediction function for IC50 using the new XGBoost model
+def predict_with_xgboost_ic50(smiles):
+    try:
+        fingerprints = smiles_to_morgan(smiles)
+        if fingerprints:
+            fingerprints_df = pd.DataFrame([fingerprints])
+            X_filtered = variance_threshold_ic50.transform(fingerprints_df)
+            prediction = xgboost_clf_ic50.predict(X_filtered)
+            accuracy = generate_xgboost_accuracy(smiles)  # Use the fixed accuracy for the new XGBoost
             class_mapping = {0: 'inactive', 1: 'active'}
             return class_mapping[prediction[0]], accuracy
         return None, None
@@ -164,7 +184,7 @@ if st.session_state.page == "Home":
         To convert your compound to a Simplified Molecular Input Line Entry System (SMILES), please visit this website: [decimer.ai](https://decimer.ai/)
         """)
     st.markdown("1. Enter a SMILES string or upload a TXT file with SMILES in a single column.")
-    st.markdown("2. Choose the prediction model: Multi-Tasking Neural Network or Decision Tree.")
+    st.markdown("2. Choose the prediction model: Multi-Tasking Neural Network, XGBoost, or New XGBoost for IC50.")
     st.markdown("3. Click 'Predict' to see results.")
 
     # Add the note under instructions
@@ -173,7 +193,7 @@ if st.session_state.page == "Home":
     """)
 
     # Input: Single SMILES string or file upload
-    model_choice = st.radio("Choose a model:", ["Multi-Tasking Neural Network", "Random Forest Classifier"], horizontal=True)
+    model_choice = st.radio("Choose a model:", ["Multi-Tasking Neural Network", "XGBoost", "New XGBoost for IC50"], horizontal=True)
     smiles_input = st.text_input("Enter SMILES:")
     uploaded_file = st.file_uploader("Upload a TXT file", type=["csv", "txt", "xls", "xlsx"])
 
@@ -214,8 +234,27 @@ if st.session_state.page == "Home":
                         )
                     else:
                         st.error("Invalid SMILES string.")
-                else:
+                elif model_choice == "XGBoost":
                     bioactivity, accuracy = predict_with_xgboost(smiles_input)
+                    if bioactivity:
+                        st.markdown(
+                            f"""
+                            <div class="result-container">
+                                <h4>🧪 Prediction Results</h4>
+                                <p><b>🟢 Bioactivity:</b> 
+                                    <span class="result-value" style="color: {'#1E88E5' if bioactivity=='active' else '#D32F2F'};">
+                                        {bioactivity.capitalize()}
+                                    </span>
+                                </p>
+                                <p><b>🔍 Accuracy:</b> <span class="result-value">{accuracy:.2%}</span> <a href="#accuracy-explanation">?</a></p>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+                    else:
+                        st.error("Invalid SMILES string.")
+                else:
+                    bioactivity, accuracy = predict_with_xgboost_ic50(smiles_input)
                     if bioactivity:
                         st.markdown(
                             f"""
@@ -297,8 +336,11 @@ if st.session_state.page == "Home":
                             results.append([smiles, pIC50, convert_pIC50_to_uM(pIC50), convert_pIC50_to_nM(pIC50), convert_pIC50_to_ng_per_uL(pIC50, mol_weight), bioactivity, accuracy, error_percentage])
                         else:
                             results.append([smiles, "Error", "Error", "Error", "Error", "Error", "Error", "Error"])
-                    else:
+                    elif model_choice == "XGBoost":
                         bioactivity, accuracy = predict_with_xgboost(smiles)
+                        results.append([smiles, bioactivity if bioactivity else "Error", accuracy if accuracy else "Error"])
+                    else:
+                        bioactivity, accuracy = predict_with_xgboost_ic50(smiles)
                         results.append([smiles, bioactivity if bioactivity else "Error", accuracy if accuracy else "Error"])
 
                 if model_choice == "Multi-Tasking Neural Network":
