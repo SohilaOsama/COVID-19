@@ -18,7 +18,7 @@ from molecular_visualization import show_molecular_visualization, generate_3d_vi
 nn_model = TFSMLayer('multi_tasking_model_converted', call_endpoint='serving_default')
 scaler = joblib.load('scaler.pkl')
 selected_features = joblib.load('selected_features.pkl')
-stacking_clf = joblib.load('random_forest_model1.pkl')
+xgboost_clf = joblib.load('xgboost_model1.pkl')
 variance_threshold = joblib.load('variance_threshold1.pkl')
 
 # Detect encoding of uploaded file
@@ -93,14 +93,14 @@ def predict_with_nn(smiles):
         st.error(f"Error in prediction: {e}")
         return None, None, None, None
 
-# Prediction function for Stacking Classifier
-def predict_with_stacking(smiles):
+# Prediction function for XGBoost Classifier
+def predict_with_xgboost(smiles):
     try:
         fingerprints = smiles_to_morgan(smiles)
         if fingerprints:
             fingerprints_df = pd.DataFrame([fingerprints])
             X_filtered = variance_threshold.transform(fingerprints_df)
-            prediction = stacking_clf.predict(X_filtered)
+            prediction = xgboost_clf.predict(X_filtered)
             accuracy, _ = generate(smiles)  # Use the same function to generate fixed accuracy
             class_mapping = {0: 'inactive', 1: 'active'}
             return class_mapping[prediction[0]], accuracy
@@ -168,7 +168,7 @@ if st.session_state.page == "Home":
     """)
 
     # Input: Single SMILES string or file upload
-    model_choice = st.radio("Choose a model:", ["Multi-Tasking Neural Network", "Decision Tree"], horizontal=True)
+    model_choice = st.radio("Choose a model:", ["Multi-Tasking Neural Network", "XGBoost Classifier"], horizontal=True)
     smiles_input = st.text_input("Enter SMILES:")
     uploaded_file = st.file_uploader("Upload a TXT file", type=["csv", "txt", "xls", "xlsx"])
 
@@ -210,7 +210,7 @@ if st.session_state.page == "Home":
                     else:
                         st.error("Invalid SMILES string.")
                 else:
-                    bioactivity, accuracy = predict_with_stacking(smiles_input)
+                    bioactivity, accuracy = predict_with_xgboost(smiles_input)
                     if bioactivity:
                         st.markdown(
                             f"""
@@ -293,7 +293,7 @@ if st.session_state.page == "Home":
                         else:
                             results.append([smiles, "Error", "Error", "Error", "Error", "Error", "Error", "Error"])
                     else:
-                        bioactivity, accuracy = predict_with_stacking(smiles)
+                        bioactivity, accuracy = predict_with_xgboost(smiles)
                         results.append([smiles, bioactivity if bioactivity else "Error", accuracy if accuracy else "Error"])
 
                 if model_choice == "Multi-Tasking Neural Network":
