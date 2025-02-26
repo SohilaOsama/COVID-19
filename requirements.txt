@@ -10,4 +10,5 @@ streamlit-ketcher
 # rdkit-pypi
 pillow  
 scikit-learn
+xgboost
 
