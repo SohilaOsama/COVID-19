@@ -36,10 +36,14 @@ def calculate_descriptors(smiles):
             'MolWt': Descriptors.MolWt(mol),
             'LogP': Descriptors.MolLogP(mol),
             'NumHDonors': Descriptors.NumHDonors(mol),
-            'NumHAcceptors': Descriptors.NumHAcceptors(mol),
-            'HAC': mol.GetNumHeavyAtoms()
+            'NumHAcceptors': Descriptors.NumHAcceptors(mol)
         }
     return None
+
+# Compute Heavy Atom Count (HAC)
+def compute_heavy_atom_count(smiles):
+    mol = Chem.MolFromSmiles(smiles)
+    return Descriptors.HeavyAtomCount(mol) if mol else None
 
 # Convert SMILES to Morgan fingerprints
 def smiles_to_morgan(smiles, radius=2, n_bits=1024):
@@ -54,15 +58,8 @@ def generate(smiles):
 
 # Function to compute Ligand Efficiency (LE)
 def compute_ligand_efficiency(smiles, pIC50):
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        return None  # Invalid SMILES
-
-    # Compute number of heavy (non-hydrogen) atoms
-    N_heavy = Descriptors.HeavyAtomCount(mol)
-
-    # Compute LE
-    LE = pIC50 / N_heavy if N_heavy != 0 else None
+    HAC = compute_heavy_atom_count(smiles)
+    LE = pIC50 / HAC if HAC and HAC != 0 else None
     return LE
 
 # Prediction using multi-tasking neural network
