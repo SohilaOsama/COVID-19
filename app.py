@@ -103,11 +103,11 @@ def predict_with_xgboost(smiles):
             prediction = xgboost_clf.predict(X_filtered)
             accuracy, _ = generate(smiles)  # Use the same function to generate fixed accuracy
             class_mapping = {0: 'inactive', 1: 'active'}
-            return class_mapping[prediction[0]]
-        return None
+            return class_mapping[prediction[0]], accuracy
+        return None, None
     except Exception as e:
         st.error(f"Error in prediction: {e}")
-        return None
+        return None, None
 
 # Convert pIC50 values
 def convert_pIC50_to_uM(pIC50):
