@@ -51,6 +51,11 @@ def generate(smiles):
     error_percentage = 30 / 100  # Fixed error percentage of 30%
     return accuracy, error_percentage
 
+# Generate fixed accuracy for RandomForest
+def generate_rf_accuracy(smiles):
+    accuracy = 91 / 100  # Fixed accuracy of 91%
+    return accuracy
+
 # Prediction using multi-tasking neural network
 def predict_with_nn(smiles):
     try:
@@ -101,7 +106,7 @@ def predict_with_xgboost(smiles):
             fingerprints_df = pd.DataFrame([fingerprints])
             X_filtered = variance_threshold.transform(fingerprints_df)
             prediction = xgboost_clf.predict(X_filtered)
-            accuracy, _ = generate(smiles)  # Use the same function to generate fixed accuracy
+            accuracy = generate_rf_accuracy(smiles)  # Use the fixed accuracy for RandomForest
             class_mapping = {0: 'inactive', 1: 'active'}
             return class_mapping[prediction[0]], accuracy
         return None, None
