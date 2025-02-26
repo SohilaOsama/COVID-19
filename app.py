@@ -8,7 +8,6 @@ from keras.layers import TFSMLayer
 import numpy as np
 import chardet  # For automatic encoding detection
 import hashlib  # For generating fixed accuracy and error
-import xgboost as xgb  # Ensure you have xgboost installed
 
 from about import show_about
 from readme import show_readme
@@ -19,7 +18,7 @@ from molecular_visualization import show_molecular_visualization, generate_3d_vi
 nn_model = TFSMLayer('multi_tasking_model_converted', call_endpoint='serving_default')
 scaler = joblib.load('scaler.pkl')
 selected_features = joblib.load('selected_features.pkl')
-xgboost_model = joblib.load('xgboost_model1.pkl')  # Load the XGBoost model
+stacking_clf = joblib.load('random_forest_model1.pkl')
 variance_threshold = joblib.load('variance_threshold1.pkl')
 
 # Detect encoding of uploaded file
@@ -34,15 +33,10 @@ def calculate_descriptors(smiles):
     mol = Chem.MolFromSmiles(smiles)
     if mol:
         return {
-            'MolecularWeight': Descriptors.MolWt(mol),
+            'MolWt': Descriptors.MolWt(mol),
             'LogP': Descriptors.MolLogP(mol),
-            'HydrogenBondDonors': Descriptors.NumHDonors(mol),
-            'HydrogenBondAcceptors': Descriptors.NumHAcceptors(mol),
-            'TopologicalPolarSurfaceArea': Descriptors.TPSA(mol),
-            'NumberofRotatableBonds': Descriptors.NumRotatableBonds(mol),
-            'NumberofValenceElectrons': Descriptors.NumValenceElectrons(mol),
-            'NumberofAromaticRings': Descriptors.NumAromaticRings(mol),
-            'Fractionofsp3Carbons': Descriptors.FractionCSP3(mol)
+            'NumHDonors': Descriptors.NumHDonors(mol),
+            'NumHAcceptors': Descriptors.NumHAcceptors(mol)
         }
     return None
 
@@ -60,18 +54,22 @@ def generate(smiles):
 # Prediction using multi-tasking neural network
 def predict_with_nn(smiles):
     try:
+        # Calculate molecular descriptors
+        descriptors = calculate_descriptors(smiles)
+        descriptors_df = pd.DataFrame([descriptors])
+
         # Convert SMILES to Morgan fingerprints
         fingerprints = smiles_to_morgan(smiles)
-        if fingerprints is None:
-            raise ValueError("Invalid SMILES string.")
-        
         fingerprints_df = pd.DataFrame([fingerprints], columns=[str(i) for i in range(len(fingerprints))])
 
+        # Combine descriptors and fingerprints
+        combined_df = pd.concat([descriptors_df, fingerprints_df], axis=1)
+
         # Scale the features
-        combined_scaled = scaler.transform(fingerprints_df)
+        combined_scaled = scaler.transform(combined_df)
 
         # Select only the features used during training
-        combined_selected = pd.DataFrame(combined_scaled, columns=fingerprints_df.columns)[selected_features]
+        combined_selected = pd.DataFrame(combined_scaled, columns=combined_df.columns)[selected_features]
 
         # Convert to NumPy array for inference
         input_data = combined_selected.to_numpy()
@@ -95,18 +93,17 @@ def predict_with_nn(smiles):
         st.error(f"Error in prediction: {e}")
         return None, None, None, None
 
-# Prediction function for XGBoost model
-def predict_with_xgboost(smiles):
+# Prediction function for Stacking Classifier
+def predict_with_stacking(smiles):
     try:
         fingerprints = smiles_to_morgan(smiles)
         if fingerprints:
             fingerprints_df = pd.DataFrame([fingerprints])
             X_filtered = variance_threshold.transform(fingerprints_df)
-            dmatrix = xgb.DMatrix(X_filtered)
-            prediction = xgboost_model.predict(dmatrix)
+            prediction = stacking_clf.predict(X_filtered)
             accuracy, _ = generate(smiles)  # Use the same function to generate fixed accuracy
             class_mapping = {0: 'inactive', 1: 'active'}
-            return class_mapping[int(prediction[0])], accuracy
+            return class_mapping[prediction[0]], accuracy
         return None, None
     except Exception as e:
         st.error(f"Error in prediction: {e}")
@@ -162,16 +159,16 @@ if st.session_state.page == "Home":
         To convert your compound to a Simplified Molecular Input Line Entry System (SMILES), please visit this website: [decimer.ai](https://decimer.ai/)
         """)
     st.markdown("1. Enter a SMILES string or upload a TXT file with SMILES in a single column.")
-    st.markdown("2. Choose the prediction model: Multi-Tasking Neural Network or XGBoost.")
+    st.markdown("2. Choose the prediction model: Multi-Tasking Neural Network or Decision Tree.")
     st.markdown("3. Click 'Predict' to see results.")
 
     # Add the note under instructions
     st.markdown("""
-    The ligand efficiency cut off for hit compounds is set to be between 0.2 and 0.35. Hit compounds are compounds that show some activity against the target protein and can be chemically modified to have improved potency and drug-like properties. The binding of hits to the target does not have to be extremely good as this can be optimised further after hit identification. This broad range of ligand efficiencies chosen is due a large range of heavy atom counts (HAC) among all the screened compounds. HAC is a proxy for molecular size. The optimal ligand effiency cut off depends on the molecular size of the screened compounds. The details of calculating target ligand efficiency values can be found in this paper. [⁵](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3772997/#FD2). A larger range of ligand efficiency values also allow for a more diverse set of hits to be investigated. This can potentially lead to drug molecules with novel structures compared to marketed drugs.
+    The ligand efficiency cut off for hit compounds is set to be between 0.2 and 0.35. Hit compounds are compounds that show some activity against the target protein and can be chemically modified to have improved potency and drug-like properties. The binding of hits to the target does not have to be extremely good as this can be optimised further after hit identification. This broad range of ligand efficiencies chosen is due a large range of heavy atom counts (HAC) among all the screened compounds. HAC is a proxy for molecular size. The optimal ligand effiency cut off depends on the molecular size of the screened compounds. The details of calculating target ligand efficiency values can be found in this paper. [1](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3772997/#FD2). A larger range of ligand efficiency values also allow for a more diverse set of hits to be investigated. This can potentially lead to drug molecules with novel structures compared to marketed drugs.
     """)
 
     # Input: Single SMILES string or file upload
-    model_choice = st.radio("Choose a model:", ["Multi-Tasking Neural Network", "XGBoost"], horizontal=True)
+    model_choice = st.radio("Choose a model:", ["Multi-Tasking Neural Network", "Decision Tree"], horizontal=True)
     smiles_input = st.text_input("Enter SMILES:")
     uploaded_file = st.file_uploader("Upload a TXT file", type=["csv", "txt", "xls", "xlsx"])
 
@@ -190,7 +187,7 @@ if st.session_state.page == "Home":
                 if model_choice == "Multi-Tasking Neural Network":
                     pIC50, bioactivity, accuracy, error_percentage = predict_with_nn(smiles_input)
                     if pIC50 is not None:
-                        mol_weight = descriptors['MolecularWeight']
+                        mol_weight = calculate_descriptors(smiles_input)['MolWt']
                         st.markdown(
                             f"""
                             <div class="result-container">
@@ -213,7 +210,7 @@ if st.session_state.page == "Home":
                     else:
                         st.error("Invalid SMILES string.")
                 else:
-                    bioactivity, accuracy = predict_with_xgboost(smiles_input)
+                    bioactivity, accuracy = predict_with_stacking(smiles_input)
                     if bioactivity:
                         st.markdown(
                             f"""
@@ -291,12 +288,12 @@ if st.session_state.page == "Home":
                     if model_choice == "Multi-Tasking Neural Network":
                         pIC50, bioactivity, accuracy, error_percentage = predict_with_nn(smiles)
                         if pIC50 is not None:
-                            mol_weight = calculate_descriptors(smiles)['MolecularWeight']
+                            mol_weight = calculate_descriptors(smiles)['MolWt']
                             results.append([smiles, pIC50, convert_pIC50_to_uM(pIC50), convert_pIC50_to_nM(pIC50), convert_pIC50_to_ng_per_uL(pIC50, mol_weight), bioactivity, accuracy, error_percentage])
                         else:
                             results.append([smiles, "Error", "Error", "Error", "Error", "Error", "Error", "Error"])
                     else:
-                        bioactivity, accuracy = predict_with_xgboost(smiles)
+                        bioactivity, accuracy = predict_with_stacking(smiles)
                         results.append([smiles, bioactivity if bioactivity else "Error", accuracy if accuracy else "Error"])
 
                 if model_choice == "Multi-Tasking Neural Network":
