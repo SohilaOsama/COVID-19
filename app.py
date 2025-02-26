@@ -93,7 +93,7 @@ def predict_with_nn(smiles):
         st.error(f"Error in prediction: {e}")
         return None, None, None, None
 
-# Prediction function for XGBoost Classifier
+# Prediction function 
 def predict_with_xgboost(smiles):
     try:
         fingerprints = smiles_to_morgan(smiles)
@@ -168,7 +168,7 @@ if st.session_state.page == "Home":
     """)
 
     # Input: Single SMILES string or file upload
-    model_choice = st.radio("Choose a model:", ["Multi-Tasking Neural Network", "XGBoost Classifier"], horizontal=True)
+    model_choice = st.radio("Choose a model:", ["Multi-Tasking Neural Network", "Random Forest Classifier"], horizontal=True)
     smiles_input = st.text_input("Enter SMILES:")
     uploaded_file = st.file_uploader("Upload a TXT file", type=["csv", "txt", "xls", "xlsx"])
 
