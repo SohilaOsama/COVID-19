@@ -184,7 +184,7 @@ if st.session_state.page == "Home":
         To convert your compound to a Simplified Molecular Input Line Entry System (SMILES), please visit this website: [decimer.ai](https://decimer.ai/)
         """)
     st.markdown("1. Enter a SMILES string or upload a TXT file with SMILES in a single column.")
-    st.markdown("2. Choose the prediction model: Multi-Tasking Neural Network, XGBoost, or New XGBoost for IC50.")
+    st.markdown("2. Choose the prediction model: Multi-Tasking Neural Network, Random Forest, or New Random Forest for IC50.")
     st.markdown("3. Click 'Predict' to see results.")
 
     # Add the note under instructions
@@ -193,7 +193,7 @@ if st.session_state.page == "Home":
     """)
 
     # Input: Single SMILES string or file upload
-    model_choice = st.radio("Choose a model:", ["Multi-Tasking Neural Network", "XGBoost", "New XGBoost for IC50"], horizontal=True)
+    model_choice = st.radio("Choose a model:", ["Multi-Tasking Neural Network", "Random Forest", "New Random Forest for IC50"], horizontal=True)
     smiles_input = st.text_input("Enter SMILES:")
     uploaded_file = st.file_uploader("Upload a TXT file", type=["csv", "txt", "xls", "xlsx"])
 
