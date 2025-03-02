@@ -115,6 +115,7 @@ def predict_with_xgboost(smiles):
         if fingerprints:
             fingerprints_df = pd.DataFrame([fingerprints])
             X_filtered = variance_threshold.transform(fingerprints_df)
+            print("XGBoost Input Data:", X_filtered)  # Debugging print statement
             prediction = xgboost_clf.predict(X_filtered)
             accuracy = generate_xgboost_accuracy(smiles)  # Use the fixed accuracy for XGBoost
             class_mapping = {0: 'inactive', 1: 'active'}
@@ -131,6 +132,7 @@ def predict_with_xgboost_ic50(smiles):
         if fingerprints:
             fingerprints_df = pd.DataFrame([fingerprints])
             X_filtered = variance_threshold_ic50.transform(fingerprints_df)
+            print("XGBoost IC50 Input Data:", X_filtered)  # Debugging print statement
             prediction = xgboost_clf_ic50.predict(X_filtered)
             accuracy = generate_xgboost_IC50_accuracy(smiles)  # Use the fixed accuracy for the new XGBoost
             class_mapping = {0: 'inactive', 1: 'active'}
