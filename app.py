@@ -60,6 +60,12 @@ def generate_xgboost_accuracy(smiles):
     accuracy = 91 / 100  # Fixed accuracy of 91%
     return accuracy
 
+# Generate fixed accuracy for XGBoost
+def generate_xgboost_IC50_accuracy(smiles):
+    accuracy = 88 / 100  # Fixed accuracy of 91%
+    return accuracy
+
+
 # Prediction using multi-tasking neural network
 def predict_with_nn(smiles):
     try:
@@ -126,7 +132,7 @@ def predict_with_xgboost_ic50(smiles):
             fingerprints_df = pd.DataFrame([fingerprints])
             X_filtered = variance_threshold_ic50.transform(fingerprints_df)
             prediction = xgboost_clf_ic50.predict(X_filtered)
-            accuracy = generate_xgboost_accuracy(smiles)  # Use the fixed accuracy for the new XGBoost
+            accuracy = generate_xgboost_IC50_accuracy(smiles)  # Use the fixed accuracy for the new XGBoost
             class_mapping = {0: 'inactive', 1: 'active'}
             return class_mapping[prediction[0]], accuracy
         return None, None
