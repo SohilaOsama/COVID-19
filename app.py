@@ -1,29 +1,19 @@
 import streamlit as st
 import pandas as pd
-import joblib
-from rdkit import Chem
-from rdkit.Chem import AllChem, Descriptors
-import tensorflow as tf
-from keras.layers import TFSMLayer
-import numpy as np
 import chardet  # For automatic encoding detection
-import hashlib  # For generating fixed accuracy and error
-
+from neural_network_predictor import NeuralNetworkPredictor
+from xgboost_predictor import XGBoostPredictor
+from xgboost_ic50_predictor import XGBoostIC50Predictor
 from about import show_about
 from readme import show_readme
 from mission import show_mission
-from molecular_visualization import show_molecular_visualization, generate_3d_view, generate_2d_view  # Import the necessary functions
+from molecular_visualization import show_molecular_visualization, generate_3d_view, generate_2d_view
+import concurrent.futures
 
-# Load models and preprocessing steps
-nn_model = TFSMLayer('multi_tasking_model_converted', call_endpoint='serving_default')
-scaler = joblib.load('scaler.pkl')
-selected_features = joblib.load('selected_features.pkl')
-xgboost_clf = joblib.load('xgboost_model1.pkl')
-variance_threshold = joblib.load('variance_threshold1.pkl')
-
-# Load new models for IC50 classification and prediction
-xgboost_clf_ic50 = joblib.load('xgboost_model1_IC50.pkl')
-variance_threshold_ic50 = joblib.load('variance_threshold1_IC50.pkl')
+# Initialize predictors
+nn_predictor = NeuralNetworkPredictor()
+xgboost_predictor = XGBoostPredictor()
+xgboost_ic50_predictor = XGBoostIC50Predictor()
 
 # Detect encoding of uploaded file
 def detect_encoding(file):
@@ -31,114 +21,6 @@ def detect_encoding(file):
     file.seek(0)  # Reset file position
     result = chardet.detect(raw_data)  # Detect encoding
     return result["encoding"]
-
-# Compute molecular descriptors
-def calculate_descriptors(smiles):
-    mol = Chem.MolFromSmiles(smiles)
-    if mol:
-        return {
-            'MolWt': Descriptors.MolWt(mol),
-            'LogP': Descriptors.MolLogP(mol),
-            'NumHDonors': Descriptors.NumHDonors(mol),
-            'NumHAcceptors': Descriptors.NumHAcceptors(mol)
-        }
-    return None
-
-# Convert SMILES to Morgan fingerprints
-def smiles_to_morgan(smiles, radius=2, n_bits=1024):
-    mol = Chem.MolFromSmiles(smiles)
-    return list(AllChem.GetMorganFingerprintAsBitVect(mol, radius, nBits=n_bits)) if mol else None
-
-# Generate fixed accuracy and error percentage
-def generate(smiles):
-    accuracy = 88 / 100  # Fixed accuracy of 88%
-    error_percentage = 30 / 100  # Fixed error percentage of 30%
-    return accuracy, error_percentage
-
-# Generate fixed accuracy for XGBoost
-def generate_xgboost_accuracy(smiles):
-    accuracy = 91 / 100  # Fixed accuracy of 91%
-    return accuracy
-
-# Generate fixed accuracy for XGBoost
-def generate_xgboost_IC50_accuracy(smiles):
-    accuracy = 88 / 100  # Fixed accuracy of 91%
-    return accuracy
-
-
-# Prediction using multi-tasking neural network
-def predict_with_nn(smiles):
-    try:
-        # Calculate molecular descriptors
-        descriptors = calculate_descriptors(smiles)
-        descriptors_df = pd.DataFrame([descriptors])
-
-        # Convert SMILES to Morgan fingerprints
-        fingerprints = smiles_to_morgan(smiles)
-        fingerprints_df = pd.DataFrame([fingerprints], columns=[str(i) for i in range(len(fingerprints))])
-
-        # Combine descriptors and fingerprints
-        combined_df = pd.concat([descriptors_df, fingerprints_df], axis=1)
-
-        # Scale the features
-        combined_scaled = scaler.transform(combined_df)
-
-        # Select only the features used during training
-        combined_selected = pd.DataFrame(combined_scaled, columns=combined_df.columns)[selected_features]
-
-        # Convert to NumPy array for inference
-        input_data = combined_selected.to_numpy()
-
-        # Call the TFSMLayer model
-        outputs = nn_model(input_data)
-
-        # Extract the outputs
-        regression_pred = outputs['output_0'].numpy()  # Regression prediction (pIC50)
-        classification_pred = outputs['output_1'].numpy()  # Classification prediction (bioactivity)
-
-        # Extract final predictions
-        pIC50 = regression_pred[0][0]
-        bioactivity = 'active' if classification_pred[0][0] > 0.5 else 'inactive'
-
-        # Generate fixed accuracy and error percentage
-        accuracy, error_percentage = generate(smiles)
-
-        return pIC50, bioactivity, accuracy, error_percentage
-    except Exception as e:
-        st.error(f"Error in prediction: {e}")
-        return None, None, None, None
-
-# Prediction function for XGBoost
-def predict_with_xgboost(smiles):
-    try:
-        fingerprints = smiles_to_morgan(smiles)
-        if fingerprints:
-            fingerprints_df = pd.DataFrame([fingerprints])
-            X_filtered = variance_threshold.transform(fingerprints_df)
-            prediction = xgboost_clf.predict(X_filtered)
-            accuracy = generate_xgboost_accuracy(smiles)  # Use the fixed accuracy for XGBoost
-            class_mapping = {0: 'inactive', 1: 'active'}
-            return class_mapping[prediction[0]], accuracy
-        return None, None
-    except Exception as e:
-        st.error(f"Error in prediction: {e}")
-        return None, None
-
-# Prediction function for IC50 using the new XGBoost model
-def predict_with_xgboost_ic50(smiles):
-    try:
-        fingerprints = smiles_to_morgan(smiles)
-        if fingerprints:
-            fingerprints_df = pd.DataFrame([fingerprints])
-            X_filtered = variance_threshold_ic50.transform(fingerprints_df)
-            prediction = xgboost_clf_ic50.predict(X_filtered)
-            accuracy = generate_xgboost_IC50_accuracy(smiles)  # Use the fixed accuracy for the new XGBoost
-            class_mapping = {0: 'inactive', 1: 'active'}
-            return class_mapping[prediction[0]], accuracy
-        return None, None
-    except Exception as e:
-        st.error(f"Error in prediction: {e}")
-        return None, None
 
 # Convert pIC50 values
 def convert_pIC50_to_uM(pIC50):
@@ -207,77 +89,72 @@ if st.session_state.page == "Home":
         if smiles_input:
             with st.spinner("Predicting..."):
                 # Calculate descriptors and display in a table
-                descriptors = calculate_descriptors(smiles_input)
+                descriptors = nn_predictor.calculate_descriptors(smiles_input)
                 if descriptors:
                     st.markdown("### Molecular Descriptors")
                     descriptors_df = pd.DataFrame([descriptors])
                     st.table(descriptors_df)
                 else:
                     st.error("Invalid SMILES string.")
+                    st.stop()
 
-                if model_choice == "Multi-Tasking Neural Network":
-                    pIC50, bioactivity, accuracy, error_percentage = predict_with_nn(smiles_input)
-                    if pIC50 is not None:
-                        mol_weight = calculate_descriptors(smiles_input)['MolWt']
-                        st.markdown(
-                            f"""
-                            <div class="result-container">
-                                <h4>🧪 Prediction Results</h4>
-                                <p><b>📊 pIC50 Value:</b> <span class="result-value">{pIC50:.2f}</span></p>
-                                <p><b>⚗️ IC50 (µM):</b> <span class="result-value">{convert_pIC50_to_uM(pIC50):.2f} µM</span></p>
-                                <p><b>🧪 IC50 (nM):</b> <span class="result-value">{convert_pIC50_to_nM(pIC50):.2f} nM</span></p>
-                                <p><b>🧬 IC50 (ng/µL):</b> <span class="result-value">{convert_pIC50_to_ng_per_uL(pIC50, mol_weight):.2f} ng/µL</span></p>
-                                <p><b>🟢 Bioactivity:</b> 
-                                    <span class="result-value" style="color: {'#1E88E5' if bioactivity=='active' else '#D32F2F'};">
-                                        {bioactivity.capitalize()}
-                                    </span>
-                                </p>
-                                <p><b>🔍 Accuracy:</b> <span class="result-value">{accuracy:.2%}</span> <a href="#accuracy-explanation">?</a></p>
-                                <p><b>📉 Error Percentage:</b> <span class="result-value" style="color: #D32F2F;">{error_percentage:.2%}</span> <a href="#error-explanation">?</a></p>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
+                def predict():
+                    if model_choice == "Multi-Tasking Neural Network":
+                        return nn_predictor.predict(smiles_input)
+                    elif model_choice == "Random Forest":
+                        return xgboost_predictor.predict(smiles_input)
                     else:
-                        st.error("Invalid SMILES string.")
-                elif model_choice == "XGBoost":
-                    bioactivity, accuracy = predict_with_xgboost(smiles_input)
-                    if bioactivity:
-                        st.markdown(
-                            f"""
-                            <div class="result-container">
-                                <h4>🧪 Prediction Results</h4>
-                                <p><b>🟢 Bioactivity:</b> 
-                                    <span class="result-value" style="color: {'#1E88E5' if bioactivity=='active' else '#D32F2F'};">
-                                        {bioactivity.capitalize()}
-                                    </span>
-                                </p>
-                                <p><b>🔍 Accuracy:</b> <span class="result-value">{accuracy:.2%}</span> <a href="#accuracy-explanation">?</a></p>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
+                        return xgboost_ic50_predictor.predict(smiles_input)
+
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(predict)
+                    result = future.result()
+
+                if result:
+                    if model_choice == "Multi-Tasking Neural Network":
+                        pIC50, bioactivity, accuracy, error_percentage = result
+                        if pIC50 is not None:
+                            mol_weight = descriptors['MolWt']
+                            st.markdown(
+                                f"""
+                                <div class="result-container">
+                                    <h4>🧪 Prediction Results</h4>
+                                    <p><b>📊 pIC50 Value:</b> <span class="result-value">{pIC50:.2f}</span></p>
+                                    <p><b>⚗️ IC50 (µM):</b> <span class="result-value">{convert_pIC50_to_uM(pIC50):.2f} µM</span></p>
+                                    <p><b>🧪 IC50 (nM):</b> <span class="result-value">{convert_pIC50_to_nM(pIC50):.2f} nM</span></p>
+                                    <p><b>🧬 IC50 (ng/µL):</b> <span class="result-value">{convert_pIC50_to_ng_per_uL(pIC50, mol_weight):.2f} ng/µL</span></p>
+                                    <p><b>🟢 Bioactivity:</b> 
+                                        <span class="result-value" style="color: {'#1E88E5' if bioactivity=='active' else '#D32F2F'};">
+                                            {bioactivity.capitalize()}
+                                        </span>
+                                    </p>
+                                    <p><b>🔍 Accuracy:</b> <span class="result-value">{accuracy:.2%}</span> <a href="#accuracy-explanation">?</a></p>
+                                    <p><b>📉 Error Percentage:</b> <span class="result-value" style="color: #D32F2F;">{error_percentage:.2%}</span> <a href="#error-explanation">?</a></p>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                        else:
+                            st.error("Invalid SMILES string.")
                     else:
-                        st.error("Invalid SMILES string.")
-                else:
-                    bioactivity, accuracy = predict_with_xgboost_ic50(smiles_input)
-                    if bioactivity:
-                        st.markdown(
-                            f"""
-                            <div class="result-container">
-                                <h4>🧪 Prediction Results</h4>
-                                <p><b>🟢 Bioactivity:</b> 
-                                    <span class="result-value" style="color: {'#1E88E5' if bioactivity=='active' else '#D32F2F'};">
-                                        {bioactivity.capitalize()}
-                                    </span>
-                                </p>
-                                <p><b>🔍 Accuracy:</b> <span class="result-value">{accuracy:.2%}</span> <a href="#accuracy-explanation">?</a></p>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-                    else:
-                        st.error("Invalid SMILES string.")
+                        bioactivity, accuracy = result
+                        if bioactivity:
+                            st.markdown(
+                                f"""
+                                <div class="result-container">
+                                    <h4>🧪 Prediction Results</h4>
+                                    <p><b>🟢 Bioactivity:</b> 
+                                        <span class="result-value" style="color: {'#1E88E5' if bioactivity=='active' else '#D32F2F'};">
+                                            {bioactivity.capitalize()}
+                                        </span>
+                                    </p>
+                                    <p><b>🔍 Accuracy:</b> <span class="result-value">{accuracy:.2%}</span> <a href="#accuracy-explanation">?</a></p>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                        else:
+                            st.error("Invalid SMILES string.")
 
             # Visualize the 3D structure
             st.markdown("## 3D Structure Visualization")
@@ -335,19 +212,29 @@ if st.session_state.page == "Home":
 
                 results = []
                 for smiles in df["SMILES"]:
-                    if model_choice == "Multi-Tasking Neural Network":
-                        pIC50, bioactivity, accuracy, error_percentage = predict_with_nn(smiles)
-                        if pIC50 is not None:
-                            mol_weight = calculate_descriptors(smiles)['MolWt']
-                            results.append([smiles, pIC50, convert_pIC50_to_uM(pIC50), convert_pIC50_to_nM(pIC50), convert_pIC50_to_ng_per_uL(pIC50, mol_weight), bioactivity, accuracy, error_percentage])
+                    def predict(smiles):
+                        if model_choice == "Multi-Tasking Neural Network":
+                            return nn_predictor.predict(smiles)
+                        elif model_choice == "Random Forest":
+                            return xgboost_predictor.predict(smiles)
                         else:
-                            results.append([smiles, "Error", "Error", "Error", "Error", "Error", "Error", "Error"])
-                    elif model_choice == "XGBoost":
-                        bioactivity, accuracy = predict_with_xgboost(smiles)
-                        results.append([smiles, bioactivity if bioactivity else "Error", accuracy if accuracy else "Error"])
-                    else:
-                        bioactivity, accuracy = predict_with_xgboost_ic50(smiles)
-                        results.append([smiles, bioactivity if bioactivity else "Error", accuracy if accuracy else "Error"])
+                            return xgboost_ic50_predictor.predict(smiles)
+
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(predict, smiles)
+                        result = future.result()
+
+                    if result:
+                        if model_choice == "Multi-Tasking Neural Network":
+                            pIC50, bioactivity, accuracy, error_percentage = result
+                            if pIC50 is not None:
+                                mol_weight = nn_predictor.calculate_descriptors(smiles)['MolWt']
+                                results.append([smiles, pIC50, convert_pIC50_to_uM(pIC50), convert_pIC50_to_nM(pIC50), convert_pIC50_to_ng_per_uL(pIC50, mol_weight), bioactivity, accuracy, error_percentage])
+                            else:
+                                results.append([smiles, "Error", "Error", "Error", "Error", "Error", "Error", "Error"])
+                        else:
+                            bioactivity, accuracy = result
+                            results.append([smiles, bioactivity if bioactivity else "Error", accuracy if accuracy else "Error"])
 
                 if model_choice == "Multi-Tasking Neural Network":
                     results_df = pd.DataFrame(results, columns=["SMILES", "pIC50", "IC50 (µM)", "IC50 (nM)", "IC50 (ng/µL)", "Bioactivity", "Accuracy", "Error Percentage"])
