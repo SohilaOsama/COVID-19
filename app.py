@@ -22,8 +22,8 @@ xgboost_clf = joblib.load('xgboost_model1.pkl')
 variance_threshold = joblib.load('variance_threshold1.pkl')
 
 # Load new models for IC50 classification and prediction
-xgboost_clf_ic50 = joblib.load('xgboost_model1_IC50.pkl')
-variance_threshold_ic50 = joblib.load('variance_threshold1_IC50.pkl')
+random_forest_clf_ic50 = joblib.load('1_random_forest_model1_IC50.pkl')
+variance_threshold_ic50 = joblib.load('1_variance_threshold1_IC50.pkl')
 
 # Detect encoding of uploaded file
 def detect_encoding(file):
@@ -60,11 +60,10 @@ def generate_xgboost_accuracy(smiles):
     accuracy = 91 / 100  # Fixed accuracy of 91%
     return accuracy
 
-# Generate fixed accuracy for XGBoost
-def generate_xgboost_IC50_accuracy(smiles):
-    accuracy = 88 / 100  # Fixed accuracy of 91%
+# Generate fixed accuracy for Random Forest
+def generate_rf_IC50_accuracy(smiles):
+    accuracy = 88 / 100  # Fixed accuracy of 88%
     return accuracy
-
 
 # Prediction using multi-tasking neural network
 def predict_with_nn(smiles):
@@ -125,16 +124,16 @@ def predict_with_xgboost(smiles):
         st.error(f"Error in prediction: {e}")
         return None, None
 
-# Prediction function for IC50 using the new XGBoost model
-def predict_with_xgboost_ic50(smiles):
+# Prediction function for IC50 using the new Random Forest model
+def predict_with_rf_ic50(smiles):
     try:
         fingerprints = smiles_to_morgan(smiles)
         if fingerprints:
             fingerprints_df = pd.DataFrame([fingerprints])
             X_filtered = variance_threshold_ic50.transform(fingerprints_df)
-            print("XGBoost IC50 Input Data:", X_filtered)  # Debugging print statement
-            prediction = xgboost_clf_ic50.predict(X_filtered)
-            accuracy = generate_xgboost_IC50_accuracy(smiles)  # Use the fixed accuracy for the new XGBoost
+            print("Random Forest IC50 Input Data:", X_filtered)  # Debugging print statement
+            prediction = random_forest_clf_ic50.predict(X_filtered)
+            accuracy = generate_rf_IC50_accuracy(smiles)  # Use the fixed accuracy for the new Random Forest
             class_mapping = {0: 'inactive', 1: 'active'}
             return class_mapping[prediction[0]], accuracy
         return None, None
@@ -262,7 +261,7 @@ if st.session_state.page == "Home":
                     else:
                         st.error("Invalid SMILES string.")
                 else:
-                    bioactivity, accuracy = predict_with_xgboost_ic50(smiles_input)
+                    bioactivity, accuracy = predict_with_rf_ic50(smiles_input)
                     if bioactivity:
                         st.markdown(
                             f"""
@@ -348,7 +347,7 @@ if st.session_state.page == "Home":
                         bioactivity, accuracy = predict_with_xgboost(smiles)
                         results.append([smiles, bioactivity if bioactivity else "Error", accuracy if accuracy else "Error"])
                     else:
-                        bioactivity, accuracy = predict_with_xgboost_ic50(smiles)
+                        bioactivity, accuracy = predict_with_rf_ic50(smiles)
                         results.append([smiles, bioactivity if bioactivity else "Error", accuracy if accuracy else "Error"])
 
                 if model_choice == "Multi-Tasking Neural Network":
