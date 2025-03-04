@@ -22,8 +22,8 @@ xgboost_clf = joblib.load('xgboost_model1.pkl')
 variance_threshold = joblib.load('variance_threshold1.pkl')
 
 # Load new models for IC50 classification and prediction
-random_forest_clf_ic50 = joblib.load('random_forest_model1_IC50.pkl')
-variance_threshold_ic50 = joblib.load('variance_threshold1_IC50.pkl')
+random_forest_clf_ic50 = joblib.load('1_random_forest_model1_IC50.pkl')
+variance_threshold_ic50 = joblib.load('1_variance_threshold1_IC50.pkl')
 
 # Detect encoding of uploaded file
 def detect_encoding(file):
