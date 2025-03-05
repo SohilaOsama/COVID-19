@@ -18,8 +18,8 @@ from molecular_visualization import show_molecular_visualization, generate_3d_vi
 nn_model = TFSMLayer('multi_tasking_model_converted', call_endpoint='serving_default')
 scaler = joblib.load('scaler.pkl')
 selected_features = joblib.load('selected_features.pkl')
-xgboost_clf = joblib.load('xgboost_model1.pkl')
-variance_threshold = joblib.load('variance_threshold1.pkl')
+xgboost_clf = joblib.load('2_random_forest_model1_LE.pkl')
+variance_threshold = joblib.load('2_variance_threshold1_LE.pkl')
 
 # Load new models for IC50 classification and prediction
 random_forest_clf_ic50 = joblib.load('1_random_forest_model1_IC50.pkl')
