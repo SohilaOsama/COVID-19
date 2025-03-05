@@ -209,7 +209,12 @@ if st.session_state.page == "Home":
     
     # Add tooltip for Random Forest for LE
     if model_choice == "Random Forest for LE":
-        st.markdown('<div class="tooltip">Random Forest for LE<span class="tooltiptext">The ligand efficiency cut off for hit compounds is set to be between 0.2 and 0.35. Hit compounds are compounds that show some activity against the target protein and can be chemically modified to have improved potency and drug-like properties. The binding of hits to the target does not have to be extremely good as this can be optimised further after hit identification. This broad range of ligand efficiencies chosen is due to a large range of heavy atom counts (HAC) among all the screened compounds. HAC is a proxy for molecular size. The optimal ligand efficiency cut off depends on the molecular size of the screened compounds. The details of calculating target ligand efficiency values can be found in this paper. [1](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3772997/#FD2). A larger range of ligand efficiency values also allow for a more diverse set of hits to be investigated. This can potentially lead to drug molecules with novel structures compared to marketed drugs.</span></div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="tooltip">Random Forest for LE'
+            '<span class="tooltiptext">The ligand efficiency cut off for hit compounds is set to be between 0.2 and 0.35. Hit compounds are compounds that show some activity against the target protein and can be chemically modified to have improved potency and drug-like properties. The binding of hits to the target does not have to be extremely good as this can be optimised further after hit identification. This broad range of ligand efficiencies chosen is due to a large range of heavy atom counts (HAC) among all the screened compounds. HAC is a proxy for molecular size. The optimal ligand efficiency cut off depends on the molecular size of the screened compounds. The details of calculating target ligand efficiency values can be found in this paper. [1](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3772997/#FD2). A larger range of ligand efficiency values also allow for a more diverse set of hits to be investigated. This can potentially lead to drug molecules with novel structures compared to marketed drugs.</span>'
+            '</div>',
+            unsafe_allow_html=True
+        )
 
     smiles_input = st.text_input("Enter SMILES:")
     uploaded_file = st.file_uploader("Upload a TXT file", type=["csv", "txt", "xls", "xlsx"])
@@ -353,7 +358,7 @@ if st.session_state.page == "Home":
                             results.append([smiles, pIC50, convert_pIC50_to_uM(pIC50), convert_pIC50_to_nM(pIC50), convert_pIC50_to_ng_per_uL(pIC50, mol_weight), bioactivity, accuracy, error_percentage])
                         else:
                             results.append([smiles, "Error", "Error", "Error", "Error", "Error", "Error", "Error"])
-                    elif model_choice == "Random Forest":
+                    elif model_choice == "Random Forest for LE":
                         bioactivity, accuracy = predict_with_xgboost(smiles)
                         results.append([smiles, bioactivity if bioactivity else "Error", accuracy if accuracy else "Error"])
                     else:
