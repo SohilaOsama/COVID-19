@@ -4,18 +4,16 @@ import joblib
 from rdkit import Chem
 from rdkit.Chem import AllChem, Descriptors
 import tensorflow as tf
-from keras.layers import TFSMLayer
 import numpy as np
 import chardet  # For automatic encoding detection
-import hashlib  # For generating fixed accuracy and error
 
 from about import show_about
 from readme import show_readme
 from mission import show_mission
-from molecular_visualization import show_molecular_visualization, generate_3d_view, generate_2d_view  # Import the necessary functions
+from molecular_visualization import show_molecular_visualization, generate_3d_view  # Import the necessary functions
 
 # Load models and preprocessing steps
-nn_model = TFSMLayer('multi_tasking_model_converted', call_endpoint='serving_default')
+nn_model = tf.keras.models.load_model('multi_tasking_model_converted')
 scaler = joblib.load('scaler.pkl')
 selected_features = joblib.load('selected_features.pkl')
 xgboost_clf = joblib.load('2_random_forest_model1_LE.pkl')
@@ -93,12 +91,12 @@ def predict_with_nn(smiles):
         # Convert to NumPy array for inference
         input_data = combined_selected.to_numpy()
 
-        # Call the TFSMLayer model
-        outputs = nn_model(input_data)
+        # Call the neural network model for predictions
+        outputs = nn_model.predict(input_data)
 
         # Extract the outputs
-        regression_pred = outputs['output_0'].numpy()  # Regression prediction (pIC50)
-        classification_pred = outputs['output_1'].numpy()  # Classification prediction (bioactivity)
+        regression_pred = outputs[0]  # Regression prediction (pIC50)
+        classification_pred = outputs[1]  # Classification prediction (bioactivity)
 
         # Extract final predictions
         pIC50 = regression_pred[0][0]
@@ -119,7 +117,6 @@ def predict_with_xgboost(smiles):
         if fingerprints:
             fingerprints_df = pd.DataFrame([fingerprints])
             X_filtered = variance_threshold.transform(fingerprints_df)
-            print("XGBoost Input Data:", X_filtered)  # Debugging print statement
             prediction = xgboost_clf.predict(X_filtered)
             accuracy = generate_xgboost_accuracy(smiles)  # Use the fixed accuracy for XGBoost
             class_mapping = {0: 'inactive', 1: 'active'}
@@ -136,7 +133,6 @@ def predict_with_rf_ic50(smiles):
         if fingerprints:
             fingerprints_df = pd.DataFrame([fingerprints])
             X_filtered = variance_threshold_ic50.transform(fingerprints_df)
-            print("Random Forest IC50 Input Data:", X_filtered)  # Debugging print statement
             prediction = random_forest_clf_ic50.predict(X_filtered)
             accuracy = generate_rf_IC50_accuracy(smiles)  # Use the fixed accuracy for the new Random Forest
             class_mapping = {0: 'inactive', 1: 'active'}
@@ -199,23 +195,9 @@ if st.session_state.page == "Home":
     st.markdown("2. Choose the prediction model: Multi-Tasking Neural Network, Random Forest, or New Random Forest for IC50.")
     st.markdown("3. Click 'Predict' to see results.")
 
-    # Add the note under instructions
-    # st.markdown("""
-    # The ligand efficiency cut off for hit compounds is set to be between 0.2 and 0.35. Hit compounds are compounds that show some activity against the target protein and can be chemically modified to have improved potency and drug-like properties. The binding of hits to the target does not have to be extremely good as this can be optimised further after hit identification. This broad range of ligand efficiencies chosen is due a large range of heavy atom counts (HAC) among all the screened compounds. HAC is a proxy for molecular size. The optimal ligand effiency cut off depends on the molecular size of the screened compounds. The details of calculating target ligand efficiency values can be found in this paper. [1](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3772997/#FD2). A larger range of ligand efficiency values also allow for a more diverse set of hits to be investigated. This can potentially lead to drug molecules with novel structures compared to marketed drugs.
-    # """)
-
     # Input: Single SMILES string or file upload
     model_choice = st.radio("Choose a model:", ["Multi-Tasking Neural Network", "Random Forest for LE", "Random Forest for IC50"], horizontal=True)
     
-    # Add tooltip for Random Forest for LE
-    if model_choice == "Random Forest for LE":
-        st.markdown(
-            '<div class="tooltip"> What is Random Forest for LE ?'
-            '<span class="tooltiptext">The ligand efficiency cut off for hit compounds is set to be between 0.2 and 0.35. Hit compounds are compounds that show some activity against the target protein and can be chemically modified to have improved potency and drug-like properties. The binding of hits to the target does not have to be extremely good as this can be optimised further after hit identification. This broad range of ligand efficiencies chosen is due to a large range of heavy atom counts (HAC) among all the screened compounds. HAC is a proxy for molecular size. The optimal ligand efficiency cut off depends on the molecular size of the screened compounds. The details of calculating target ligand efficiency values can be found in this paper. [1](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3772997/#FD2). A larger range of ligand efficiency values also allow for a more diverse set of hits to be investigated. This can potentially lead to drug molecules with novel structures compared to marketed drugs.</span>'
-            '</div>',
-            unsafe_allow_html=True
-        )
-
     smiles_input = st.text_input("Enter SMILES:")
     uploaded_file = st.file_uploader("Upload a TXT file", type=["csv", "txt", "xls", "xlsx"])
 
